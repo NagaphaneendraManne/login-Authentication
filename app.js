@@ -39,8 +39,8 @@ app.post("/register", async (request, response) => {
             '${name}','${hashedPassword}','${gender}','${location}');`;
     await db.run(createUserQuery);
     response.send("User created successfully");
-  } else if (request.body.password.length < 5) {
-    request.status(400);
+  } else if (dbUser.password.length < 5) {
+    response.status(400);
     response.send("Password is too short");
   } else {
     response.status(400);
@@ -54,8 +54,8 @@ app.post("/login", async (request, response) => {
   const selectUserQuery = `SELECT * FROM user WHERE username = '${username}';`;
   const dbUser = await db.get(selectUserQuery);
   if (dbUser === undefined) {
-    request.status(400);
-    response.send("Invalid User");
+    response.status(400);
+    response.send("Invalid user");
   } else {
     const isPasswordMatched = await bcrypt.compare(password, dbUser.password);
     if (isPasswordMatched === true) {
@@ -80,7 +80,7 @@ app.put("/change-password", async (request, response) => {
     if (isValidPassword === true) {
       const lengthOfPassword = newPassword.length;
       if (lengthOfPassword < 5) {
-        request.status(400);
+        response.status(400);
         response.send("Password is too short");
       } else {
         const encryptedPassword = await bcrypt.hash(newPassword, 10);
