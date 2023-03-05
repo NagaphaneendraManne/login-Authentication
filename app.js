@@ -4,7 +4,6 @@ const path = require("path");
 const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
 const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
 const dbPath = path.join(__dirname, "userData.db");
 
 const app = express();
@@ -25,28 +24,6 @@ const initializeDBAndServer = async () => {
   }
 };
 initializeDBAndServer();
-
-const authentication = (request, response, next) => {
-  let jwtToken;
-  const authHeader = request.headers["autherization"];
-  if (authHeader !== undefined) {
-    jwtToken = authHeader.split(" ")[1];
-  }
-  if (jwtToken === undefined) {
-    response.status(401);
-    response.send("Invalid JWT Token");
-  } else {
-    jwt.verify(jwtToken, "MY_SECRET_TOKEN", async (error, payload) => {
-      if (error) {
-        response.status(401);
-        response.send("Invalid JWT Token");
-      } else {
-        request.username = payload.username;
-        next();
-      }
-    });
-  }
-};
 
 //API 1
 app.post("/register", async (request, response) => {
@@ -82,15 +59,38 @@ app.post("/login", async (request, response) => {
   } else {
     const isPasswordMatched = await bcrypt.compare(password, dbUser.password);
     if (isPasswordMatched === true) {
-      const payload = { username: username };
-      const jwtToken = jwt.sign(payload, "MY_SECRET_TOKEN");
       response.send("Login success!");
-    } else if (isPasswordMatched === false) {
-      response.status(400);
-      response.send("Invalid password");
     } else {
       response.status(400);
-      response.send("Invalid user");
+      response.send("Invalid password");
+    }
+  }
+});
+
+//API 3
+app.put("/change-password", async (request, response) => {
+  const { username, oldPassword, newPassword } = request.body;
+  const checkForUserQuery = `SELECT * FROM user WHERE username = '${username}';`;
+  const dbUser = await db.get(checkForUserQuery);
+  if (dbUser === undefined) {
+    response.status(400);
+    response.send("User not registered");
+  } else {
+    const isValidPassword = await bcrypt.compare(oldPassword, dbUser.password);
+    if (isValidPassword === true) {
+      const lengthOfPassword = newPassword.length;
+      if (lengthOfPassword < 5) {
+        request.status(400);
+        response.send("Password is too short");
+      } else {
+        const encryptedPassword = await bcrypt.hash(newPassword, 10);
+        const updatePasswordQuery = `update user set password = '${encryptedPassword}';`;
+        await db.run(updatePasswordQuery);
+        response.send("Password updated");
+      }
+    } else {
+      response.status(400);
+      response.send("Invalid current password");
     }
   }
 });
